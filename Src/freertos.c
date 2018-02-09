@@ -9,7 +9,7 @@
   * inserted by the user or by software development tools
   * are owned by their respective copyright owners.
   *
-  * Copyright (c) 2017 STMicroelectronics International N.V. 
+  * Copyright (c) 2018 STMicroelectronics International N.V. 
   * All rights reserved.
   *
   * Redistribution and use in source and binary forms, with or without 
@@ -53,16 +53,12 @@
 
 /* USER CODE BEGIN Includes */     
 #include "main.h"
-#include "stm32l0xx_hal.h"
-#include "DataTypes.h"
 #include "comp.h"
 #include "crc.h"
-#include "usart.h"
 #include "tim.h"
-#include "Memory.h"    
-#include <string.h>
-#include "Build_def.h"
-#include "Memory.h"
+
+#include "Serial.h"
+#include "DataTypes.h"
 /* USER CODE END Includes */
 
 /* Variables -----------------------------------------------------------------*/
@@ -72,7 +68,7 @@ osThreadId HumiditySensorHandle;
 osTimerId UART_TimerHandle;
 
 /* USER CODE BEGIN Variables */
-extern const TBootloadInfo BootloadInfo;
+
 /* USER CODE END Variables */
 
 /* Function prototypes -------------------------------------------------------*/
@@ -165,14 +161,14 @@ void StartDefaultTask(void const * argument)
     osDelay(200);
     HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
     osDelay(200);
-    
+    /*
     err = HAL_UART_GetError(&huart1);
     if (USART2->ISR && USART_ISR_ORE)
     {
       USART2->ICR |= USART_ICR_ORECF; 
       USART2->CR1 |= USART_CR1_RXNEIE;
     }
-    /*switch (err)
+    switch (err)
     {
       case HAL_UART_ERROR_NONE:   break;//!< No error           
       case HAL_UART_ERROR_PE:     break;//!< Parity error      
@@ -239,27 +235,8 @@ void vTempSensorsTask(void const * argument)
       if (TP.TSens[i].ec != 0)
         TP.StatusReg |= (1 << i);
     }
-    
-    uint8_t TxBuf[20];
-    uint8_t cntr = 0;
-    TxBuf[cntr++] = OwnAddress;
-    TxBuf[cntr++] = C_GetData;
-    TxBuf[cntr++] = (uint8_t)((TP.Tavg >> 8)&0xFF);
-    TxBuf[cntr++] = (uint8_t)((TP.Tavg >> 0)&0xFF);
-    TxBuf[cntr++] = TP.StatusReg;
-    if (TP.Mode == FullStreamMode)
-    {
-      TxBuf[1] = C_GetFullData;
-      for (int i = 0; i < 4; i++)
-      {
-        TxBuf[cntr++] = (uint8_t)((TP.TSens[i].Tobj >> 8)&0xFF);
-        TxBuf[cntr++] = (uint8_t)((TP.TSens[i].Tobj >> 0)&0xFF);
-        TxBuf[cntr++] = TP.TSens[i].ec;
-      }
-    }
-    
-    if ((TP.Mode == StreamMode)|(TP.Mode == FullStreamMode))//Если термозонд в режиме потоковой передачи, то слать данные после каждого замера
-      HAL_UART_Transmit(&huart1, TxBuf, cntr, 1000);
+    if ((GetDeviceMode() == StreamMode) | (GetDeviceMode() == FullStreamMode)) //Если термозонд в режиме потоковой передачи, то слать данные после каждого замера
+      SendMeasure();
     osDelay(10);
   }
   /* USER CODE END vTempSensorsTask */
@@ -285,91 +262,7 @@ void vHumiditySensor(void const * argument)
 void UART_TimerCallback(void const * argument)
 {
   /* USER CODE BEGIN UART_TimerCallback */
-  if (TP.UART.RxBuf[0] == TargetAddress)
-  {
-    uint8_t TxBuf[150];
-    uint8_t cntr = 0;
-    TxBuf[cntr++] = OwnAddress;
-    TxBuf[cntr++] = TP.UART.RxBuf[1];
-    switch(TP.UART.RxBuf[1])
-    {
-      case C_ChangeMode:
-      {//Смена режима
-        TP.Mode = (Modes)TP.UART.RxBuf[2];
-        TxBuf[cntr++] = 1;
-        break;
-      }
-      case C_GetData:
-      {//Запрос данных
-        TxBuf[cntr++] = HI(TP.Tavg);
-        TxBuf[cntr++] = LO(TP.Tavg);
-        TxBuf[cntr++] = TP.StatusReg;
-        break;
-      }
-      case C_GetRates:
-      {//Запрос характеристии одного сенсора
-        TxBuf[cntr++] = TP.UART.RxBuf[2];
-        float *rates;
-        rates = TP.TSens[TP.UART.RxBuf[2]].Rate;
-        converter bc;
-        for (int j = 0; j < 3; j++)
-        {
-          bc.f = *(rates + j);
-          for (int i = 0; i < 4; i++)
-          {
-            TxBuf[cntr++] = bc.b[i];
-          }
-        }
-        break;
-      }
-      case C_SetRates:
-      {//Запись одной характеристики
-        float *rates;
-        rates = TP.TSens[TP.UART.RxBuf[2]].Rate;
-        converter bc;
-        uint8_t rcntr = 3;
-        for (int j = 0; j < 3; j++)
-        {
-          for (int i = 0; i < 4; i++)
-          {
-            bc.b[i] = TP.UART.RxBuf[rcntr++];
-          }
-          *(rates + j) = bc.f;
-        }
-        WriteCharacteristic(TP.UART.RxBuf[2]);
-        TxBuf[cntr++] = 1;
-        break;
-      }
-      case C_GetInfoBlock:
-      {
-        TxBuf[1] = C_GetInfoBlock;
-        memcpy(&TxBuf[2], &BootloadInfo, 128);
-        cntr = 128 + 2;
-        break;
-      }
-      case C_GetSerial:
-      {//Запрос серийного номера  
-        TxBuf[cntr++] = HI(TP.SerialNumber);
-        TxBuf[cntr++] = LO(TP.SerialNumber);
-        break;
-      }
-      case C_SetSerial:    
-      {//Запись серийного номера
-        TP.SerialNumber = TP.UART.RxBuf[2]*256 + TP.UART.RxBuf[3];
-        WriteToEEPROM(TP.SerialNumber, PMM_Serial);
-        break;
-      }
-      default:
-      {
-        cntr = 0;
-        asm("NOP");
-      }
-    }
-    HAL_UART_Transmit(&huart1, TxBuf, cntr, 1000);
-    
-  }
-  TP.UART.RxBuf[0] = 0;
-  TP.UART.Counter = 0;
+  Parser(TP.UART.RxBuf);
   /* USER CODE END UART_TimerCallback */
 }
 
