@@ -1,13 +1,13 @@
 #ifndef __BUILD_DEF_H
 #define __BUILD_DEF_H
 
-//Структура для бутлоадера
+//Структура информации о приборе
 typedef struct{                      //offset | len | example            | description
   uint8_t StructVer[8];              //  00   |  04 | 1.00               | Версия структуры
-  uint8_t HardwareVer[30];           //  04   |  30 | PAB-1.1 (PAB-3.02) | Название прибора и его аппаратная версия
+  uint8_t HardwareVer[30];           //  04   |  30 | TP-1.1 (TP-3.02)   | Название прибора и его аппаратная версия
   uint8_t SoftDate[12];              //  34   |  10 | 2017.06.09         | Дата создания прошивки
   uint8_t Empty[78];
-} TBootloadInfo;
+} TInfo;
 
 //Макросы для формирования строк версии прошивки
 #define BUILD_YEAR0 (__DATE__[ 7])

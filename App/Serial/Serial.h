@@ -8,7 +8,7 @@
 
 typedef enum
 {
-  C_ChangeMode, //Смена режима
+  C_ChangeMode = 1, //Смена режима
   C_GetData,    //Запрос усреднённой температуры
   C_GetFullData,//Данные со всех датчиков
   C_GetRates,   //Запрос коэффициентов калибровкаи

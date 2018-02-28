@@ -63,7 +63,7 @@
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-const TBootloadInfo BootloadInfo = //@ 0x800FF80 =
+const TInfo Info = //@ 0x800FF80 =
 {
   {"1.00"},
   {"TIP-TP"},

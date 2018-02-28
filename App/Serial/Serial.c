@@ -4,19 +4,22 @@
 #include "Hardware.h"
 #include <string.h>
 #include "Build_def.h"
+#include "DataTypes.h"
 
-extern const TBootloadInfo BootloadInfo;//main
+extern const TInfo Info;//main
 
+//Для отправки ответа в UART
 uint8_t TxBuf[150];
 uint8_t cntr;
 
+//Разборщик посылок
 void Parser(uint8_t *buffer)
 {
     if (*(buffer + 0) == TargetAddress)
-    {
+    {//Если посылка адресованна нам
         cntr = 0;
         TxBuf[cntr++] = OwnAddress;
-        TxBuf[cntr++] = *(buffer + 1);
+        TxBuf[cntr++] = *(buffer + 1);//Шапка ответа
         switch (*(buffer + 1))
         {
         case C_ChangeMode:
@@ -45,8 +48,8 @@ void Parser(uint8_t *buffer)
             break;
         }
         case C_GetInfoBlock:
-        {
-            memcpy(&TxBuf[2], &BootloadInfo, 128);
+        {//Запрос информации о приборе
+            memcpy(&TxBuf[2], &Info, 128);
             cntr = 128 + 2;
             break;
         }
@@ -67,12 +70,11 @@ void Parser(uint8_t *buffer)
             asm("NOP");
         }
         }
-        SendToUART(TxBuf, cntr);
+        SendToUART(TxBuf, cntr);//отправка ответа
     }
-    *(buffer + 0) = 0;
-    //TP.UART.Counter = 0;
 }
 
+//Отпарвка результатов замера без запроса
 uint8_t SendMeasure()
 {
     cntr = 0;
@@ -86,12 +88,14 @@ uint8_t SendMeasure()
         TxBuf[1] = C_GetFullData;
         for (int i = 0; i < 4; i++)
         {
-            //TxBuf[cntr++] = (uint8_t)((TP.TSens[i].Tobj >> 8) & 0xFF);
-            //TxBuf[cntr++] = (uint8_t)((TP.TSens[i].Tobj >> 0) & 0xFF);
-            //TxBuf[cntr++] = TP.TSens[i].ec;
+            uint16_t TObj;
+            uint8_t ec;
+            GetTSensorData(i, &TObj, &ec);
+            TxBuf[cntr++] = HI(TObj);
+            TxBuf[cntr++] = LO(TObj);
+            TxBuf[cntr++] = ec;
         }
     }
 
-    
    return SendToUART(TxBuf, cntr);
 }

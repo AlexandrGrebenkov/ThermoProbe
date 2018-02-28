@@ -37,7 +37,8 @@
 #include "cmsis_os.h"
 
 /* USER CODE BEGIN 0 */
-#include "DataTypes.h"
+#include "App.h"
+#include "Measure.h"
 extern osTimerId UART_TimerHandle;
 /* USER CODE END 0 */
 
@@ -47,7 +48,7 @@ extern TIM_HandleTypeDef htim6;
 extern UART_HandleTypeDef huart1;
 
 /******************************************************************************/
-/*            Cortex-M0+ Processor Interruption and Exception Handlers         */ 
+/*            Cortex-M0+ Processor Interruption and Exception Handlers         */
 /******************************************************************************/
 
 /**
@@ -110,7 +111,7 @@ void ADC1_COMP_IRQHandler(void)
 {
   /* USER CODE BEGIN ADC1_COMP_IRQn 0 */
   TIM6->CNT = 0;
-  TP.StatusReg &= ~(1 << 7);
+  SetStatusRegFlag(sf_Humiddity, 0);
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
   /* USER CODE END ADC1_COMP_IRQn 0 */
   HAL_COMP_IRQHandler(&hcomp2);
@@ -125,7 +126,7 @@ void ADC1_COMP_IRQHandler(void)
 void TIM6_DAC_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM6_DAC_IRQn 0 */
-  TP.StatusReg |= (1 << 7);
+  SetStatusRegFlag(sf_Humiddity, 1);
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
   /* USER CODE END TIM6_DAC_IRQn 0 */
   HAL_TIM_IRQHandler(&htim6);
@@ -142,13 +143,13 @@ void USART1_IRQHandler(void)
   /* USER CODE BEGIN USART1_IRQn 0 */
   if ((huart1.ErrorCode & HAL_UART_ERROR_ORE) != RESET)
   {
-    TP.UART.RxBuf[0] = USART1->RDR;
-    HAL_UART_Receive_IT(&huart1, TP.UART.RxBuf, 1);
+    uint8_t tmp = USART1->RDR;
+    HAL_UART_Receive_IT(&huart1, &tmp, 1);
   }
   else
   {
-    TP.UART.RxBuf[TP.UART.Counter++] = USART1->RDR;
-    osTimerStart(UART_TimerHandle, 1); 
+    AddToRxBuffer(USART1->RDR);
+    osTimerStart(UART_TimerHandle, 1);
   }
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);

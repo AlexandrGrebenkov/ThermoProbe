@@ -1,6 +1,9 @@
 #include "Memory.h"
 #include "stm32l0xx_hal.h"
 #include "DataTypes.h"
+
+extern termoprobe TP;//App.c
+
 const uint32_t SensorsAddr[4] = {MemSensor1Addr, MemSensor2Addr, MemSensor3Addr, MemSensor4Addr};
 
 uint8_t WriteToEEPROM(uint32_t data, uint32_t address)

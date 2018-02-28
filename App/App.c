@@ -1,7 +1,7 @@
 #include "DataTypes.h"
 #include "Memory.h"
 
-termoprobe TP;
+termoprobe TP; //Структура всего прибора
 
 /*
 Стартовая инициализация данных
@@ -98,6 +98,25 @@ uint32_t GetSerial()
   return TP.SerialNumber;
 }
 
+//Получить ссылку на буфер приёма
+uint8_t *GetUARTBuffer()
+{
+  return TP.UART.RxBuf;
+}
+//Добавить байт в буффер приёма
+void AddToRxBuffer(uint8_t data)
+{
+  if (TP.UART.Counter == RxBuffSize - 1)
+    ResetRxBuffer();
+  TP.UART.RxBuf[TP.UART.Counter++] = data;
+}
+//Очистить буфер приёма
+void ResetRxBuffer()
+{
+  TP.UART.Counter = 0;
+  TP.UART.RxBuf[0] = 0;
+}
+
 //------Измерения----------------
 uint16_t GetTAvg()
 {
@@ -109,32 +128,8 @@ uint8_t GetStatusRegister()
   return TP.StatusReg;
 }
 
-//---------------------------------------------
-void Integr(uint8_t ch)
+void GetTSensorData(uint8_t number, uint16_t* TObj, uint8_t* ec)
 {
-  uint32_t SUMM = 0;
-  for (int i = 0; i < IntegrSize; i++)
-  {
-    SUMM += TP.TSens[ch].Integr[i];
-  }
-  //Расчёт среднего:
-  TP.TSens[ch].Tobj = SUMM / IntegrSize;
-  if (TP.TSens[ch].IntegrCounter >= IntegrSize)
-    TP.TSens[ch].IntegrCounter = 0;
-}
-
-void CalcAverage(void)
-{
-  uint32_t SUMM = 0;
-  uint8_t counter = 0;
-  for (int i = 0; i < 4; i++)
-  {
-    if (TP.TSens[i].ec == 0)
-    {
-      SUMM += TP.TSens[i].Tobj;
-      counter++;
-    }
-  }
-  //Расчёт среднего:
-  TP.Tavg = SUMM / counter;
+  *TObj = TP.TSens[number].Tobj;
+  *ec = TP.TSens[number].ec;
 }
